@@ -58,6 +58,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       await publishEvent("order.created", {
         orderId: order.id,
         userId: req.user!.id,
+        email: req.user!.email,
         total,
         items,
       });
@@ -75,6 +76,7 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
   await publishEvent("order.created", {
     orderId: order.id,
     userId: req.user!.id,
+    email: req.user!.email,
     total,
     items,
   });

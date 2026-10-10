@@ -1,0 +1,74 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Application targets up",
+      "id": 1,
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [{ "expr": "sum(up{job=~\"auth-service|product-service|order-service|notification-service\"})", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "title": "HTTP 5xx rate",
+      "id": 2,
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [{ "expr": "sum(rate(http_requests_total{status_code=~\"5..\"}[1m])) / clamp_min(sum(rate(http_requests_total[1m])), 0.001)", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "title": "RabbitMQ notification backlog",
+      "id": 3,
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [{ "expr": "rabbitmq_queue_messages_ready{queue=\"notifications\"}", "refId": "A" }]
+    },
+    {
+      "type": "stat",
+      "title": "Active alerts",
+      "id": 4,
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [{ "expr": "sum(ALERTS{alertstate=\"firing\"})", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests per second",
+      "id": 5,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [{ "expr": "sum by (service) (rate(http_requests_total[1m]))", "legendFormat": "{{service}}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP p95 latency",
+      "id": 6,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket[1m])))", "legendFormat": "{{service}}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Process memory",
+      "id": 7,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "targets": [{ "expr": "process_resident_memory_bytes{job=~\"auth-service|product-service|order-service|notification-service\"}", "legendFormat": "{{job}}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Notification processing",
+      "id": 8,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [{ "expr": "sum by (status) (rate(notification_events_processed_total[1m]))", "legendFormat": "{{status}}", "refId": "A" }]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["hackathon", "baseline", "chaos"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timezone": "browser",
+  "title": "E-Commerce Resilience Baseline",
+  "uid": "ecommerce-resilience-baseline",
+  "version": 1
+}

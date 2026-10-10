@@ -1,0 +1,58 @@
+groups:
+  - name: ecommerce-safety-guardrails
+    rules:
+      - alert: ApplicationTargetDown
+        expr: up{job=~"auth-service|product-service|order-service|notification-service"} == 0
+        for: 15s
+        labels:
+          severity: critical
+          safety_action: abort_experiment
+        annotations:
+          summary: "{{ $labels.job }} is unavailable"
+
+      - alert: HighHttpErrorRate
+        expr: |
+          (
+            sum by (service) (rate(http_requests_total{status_code=~"5.."}[1m]))
+            /
+            clamp_min(sum by (service) (rate(http_requests_total[1m])), 0.001)
+            > 0.05
+          )
+          and on(service)
+          sum by (service) (rate(http_requests_total[1m])) > 0.1
+        for: 15s
+        labels:
+          severity: critical
+          safety_action: abort_experiment
+        annotations:
+          summary: "{{ $labels.service }} error rate exceeded 5%"
+
+      - alert: HighP95Latency
+        expr: |
+          (
+            histogram_quantile(
+              0.95,
+              sum by (service, le) (
+                rate(http_request_duration_seconds_bucket{route!="/login"}[1m])
+              )
+            ) > 0.1
+          )
+          and on(service)
+          sum by (service) (
+            rate(http_request_duration_seconds_count{route!="/login"}[1m])
+          ) > 0.1
+        for: 15s
+        labels:
+          severity: warning
+          safety_action: abort_experiment
+        annotations:
+          summary: "{{ $labels.service }} p95 latency exceeded 100ms"
+
+      - alert: RabbitMqNotificationBacklog
+        expr: rabbitmq_queue_messages_ready > 50
+        for: 15s
+        labels:
+          severity: warning
+          safety_action: abort_experiment
+        annotations:
+          summary: "Notification queue backlog exceeded 50 messages"

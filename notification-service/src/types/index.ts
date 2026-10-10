@@ -1,6 +1,7 @@
 export interface OrderEvent {
   orderId: string;
   userId: string;
+  email?: string;
   total?: number;
   items?: { name: string; price: number; quantity: number }[];
   status?: string;

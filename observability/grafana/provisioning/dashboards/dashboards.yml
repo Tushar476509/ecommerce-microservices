@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Ecommerce Observability
+    orgId: 1
+    folder: Hackathon
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana/dashboards

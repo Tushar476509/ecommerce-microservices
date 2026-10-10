@@ -11,6 +11,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ecommerce"]
       interval: 5s
@@ -82,12 +83,20 @@ services:
       JWT_REFRESH_SECRET: super-secret-refresh-key-change-in-production
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@test.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-123456}
       PORT: 3001
       FRONTEND_URL: http://localhost:3000
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   product-service:
     build: ./product-service
@@ -112,6 +121,12 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   order-service:
     build: ./order-service
@@ -132,21 +147,37 @@ services:
       rabbitmq:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   notification-service:
     build: ./notification-service
     container_name: ecommerce-notifications
     environment:
       RABBITMQ_URL: amqp://ecommerce:ecommerce123@rabbitmq:5672
-      RESEND_API_KEY: ${RESEND_API_KEY:-re_placeholder}
       MONGODB_URI: mongodb://ecommerce:ecommerce123@mongodb:27017/ecommerce?authSource=admin
       FROM_EMAIL: noreply@ecommerce.com
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      HEALTH_PORT: 3004
     depends_on:
       mongodb:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      mailhog:
+        condition: service_started
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3004/health/ready',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   frontend:
     build:
@@ -159,13 +190,111 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - auth-service
-      - product-service
-      - order-service
+      auth-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ─── Observability ────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: ecommerce-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      cadvisor:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: ecommerce-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    ports:
+      - "3005:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: ecommerce-cadvisor
+    privileged: true
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+    restart: unless-stopped
+
+  k6:
+    image: grafana/k6:0.54.0
+    profiles: ["tools"]
+    environment:
+      FRONTEND_URL: http://frontend:3000
+      AUTH_URL: http://auth-service:3001
+      PRODUCT_URL: http://product-service:3002
+      ORDER_URL: http://order-service:3003
+      DURATION: ${K6_DURATION:-2m}
+      BROWSE_VUS: ${K6_BROWSE_VUS:-5}
+      CHECKOUTS_PER_MINUTE: ${K6_CHECKOUTS_PER_MINUTE:-3}
+    volumes:
+      - ./observability/k6:/scripts:ro
+      - ./observability/results:/results
+    command: ["run", "--summary-export=/results/k6-summary.json", "/scripts/baseline.js"]
+    depends_on:
+      frontend:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
 
 volumes:
   postgres_data:
   mongodb_data:
   redis_data:
   rabbitmq_data:
+  prometheus_data:
+  grafana_data:

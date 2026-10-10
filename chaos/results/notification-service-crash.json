@@ -1,0 +1,264 @@
+{
+  "experiment": {
+    "id": "notification-service-crash",
+    "description": "Stop the notification consumer while checkout continues and RabbitMQ buffers the event.",
+    "target": "notification-service",
+    "fault": "container-stop",
+    "hypothesis": "Checkout remains available, one notification is buffered, and delivery resumes after rollback.",
+    "durationSeconds": 20,
+    "monitorIntervalSeconds": 2,
+    "recoveryDeadlineSeconds": 30,
+    "guardrails": {
+      "maximumConcurrentFaultTargets": 1,
+      "maximumTargetUnavailableSeconds": 15,
+      "maximumHttpErrorRate": 0.05,
+      "maximumP95LatencyMilliseconds": 100,
+      "maximumRabbitMqReadyMessages": 50
+    },
+    "expectedSafetyAction": "abort_experiment"
+  },
+  "startedAt": "2026-10-10T15:13:47+05:30",
+  "environment": "local-docker-compose-sandbox",
+  "dryRun": false,
+  "status": "passed",
+  "samples": [
+    {
+      "elapsedSeconds": 0.127,
+      "syntheticProbeStatus": {
+        "auth-service": 200,
+        "product-service": 200,
+        "order-service": 200
+      },
+      "applicationTargets": {
+        "auth-service": 1,
+        "product-service": 1,
+        "order-service": 1,
+        "notification-service": 1
+      },
+      "maximumHttpErrorRate": 0.0,
+      "errorRateService": null,
+      "maximumP95LatencyMilliseconds": 0.0,
+      "latencyService": null,
+      "rabbitmq": {
+        "messagesReady": 0,
+        "messagesUnacknowledged": 0,
+        "consumers": 1
+      },
+      "firingSafetyAlerts": []
+    },
+    {
+      "elapsedSeconds": 2.17,
+      "syntheticProbeStatus": {
+        "auth-service": 200,
+        "product-service": 200,
+        "order-service": 200
+      },
+      "applicationTargets": {
+        "auth-service": 1,
+        "product-service": 1,
+        "order-service": 1,
+        "notification-service": 1
+      },
+      "maximumHttpErrorRate": 0.0,
+      "errorRateService": null,
+      "maximumP95LatencyMilliseconds": 0.0,
+      "latencyService": null,
+      "rabbitmq": {
+        "messagesReady": 0,
+        "messagesUnacknowledged": 0,
+        "consumers": 1
+      },
+      "firingSafetyAlerts": []
+    },
+    {
+      "elapsedSeconds": 4.239,
+      "syntheticProbeStatus": {
+        "auth-service": 200,
+        "product-service": 200,
+        "order-service": 200
+      },
+      "applicationTargets": {
+        "auth-service": 1,
+        "product-service": 1,
+        "order-service": 1,
+        "notification-service": 0
+      },
+      "maximumHttpErrorRate": 0.0,
+      "errorRateService": null,
+      "maximumP95LatencyMilliseconds": 0.0,
+      "latencyService": null,
+      "rabbitmq": {
+        "messagesReady": 1,
+        "messagesUnacknowledged": 0,
+        "consumers": 0
+      },
+      "firingSafetyAlerts": []
+    },
+    {
+      "elapsedSeconds": 6.278,
+      "syntheticProbeStatus": {
+        "auth-service": 200,
+        "product-service": 200,
+        "order-service": 200
+      },
+      "applicationTargets": {
+        "auth-service": 1,
+        "product-service": 1,
+        "order-service": 1,
+        "notification-service": 0
+      },
+      "maximumHttpErrorRate": 0.0,
+      "errorRateService": null,
+      "maximumP95LatencyMilliseconds": 4.75,
+      "latencyService": "product-service",
+      "rabbitmq": {
+        "messagesReady": 1,
+        "messagesUnacknowledged": 0,
+        "consumers": 0
+      },
+      "firingSafetyAlerts": []
+    },
+    {
+      "elapsedSeconds": 8.337,
+      "syntheticProbeStatus": {
+        "auth-service": 200,
+        "product-service": 200,
+        "order-service": 200
+      },
+      "applicationTargets": {
+        "auth-service": 1,
+        "product-service": 1,
+        "order-service": 1,
+        "notification-service": 0
+      },
+      "maximumHttpErrorRate": 0.0,
+      "errorRateService": null,
+      "maximumP95LatencyMilliseconds": 4.75,
+      "latencyService": "product-service",
+      "rabbitmq": {
+        "messagesReady": 1,
+        "messagesUnacknowledged": 0,
+        "consumers": 0
+      },
+      "firingSafetyAlerts": []
+    },
+    {
+      "elapsedSeconds": 10.376,
+      "syntheticProbeStatus": {
+        "auth-service": 200,
+        "product-service": 200,
+        "order-service": 200
+      },
+      "applicationTargets": {
+        "auth-service": 1,
+        "product-service": 1,
+        "order-service": 1,
+        "notification-service": 0
+      },
+      "maximumHttpErrorRate": 0.0,
+      "errorRateService": null,
+      "maximumP95LatencyMilliseconds": 4.75,
+      "latencyService": "product-service",
+      "rabbitmq": {
+        "messagesReady": 1,
+        "messagesUnacknowledged": 0,
+        "consumers": 0
+      },
+      "firingSafetyAlerts": []
+    },
+    {
+      "elapsedSeconds": 12.422,
+      "syntheticProbeStatus": {
+        "auth-service": 200,
+        "product-service": 200,
+        "order-service": 200
+      },
+      "applicationTargets": {
+        "auth-service": 1,
+        "product-service": 1,
+        "order-service": 1,
+        "notification-service": 0
+      },
+      "maximumHttpErrorRate": 0.0,
+      "errorRateService": null,
+      "maximumP95LatencyMilliseconds": 22.749999999999996,
+      "latencyService": "auth-service",
+      "rabbitmq": {
+        "messagesReady": 1,
+        "messagesUnacknowledged": 0,
+        "consumers": 0
+      },
+      "firingSafetyAlerts": []
+    },
+    {
+      "elapsedSeconds": 14.474,
+      "syntheticProbeStatus": {
+        "auth-service": 200,
+        "product-service": 200,
+        "order-service": 200
+      },
+      "applicationTargets": {
+        "auth-service": 1,
+        "product-service": 1,
+        "order-service": 1,
+        "notification-service": 0
+      },
+      "maximumHttpErrorRate": 0.0,
+      "errorRateService": null,
+      "maximumP95LatencyMilliseconds": 22.749999999999996,
+      "latencyService": "auth-service",
+      "rabbitmq": {
+        "messagesReady": 1,
+        "messagesUnacknowledged": 0,
+        "consumers": 0
+      },
+      "firingSafetyAlerts": []
+    }
+  ],
+  "before": {
+    "applicationTargets": {
+      "auth-service": 1,
+      "product-service": 1,
+      "order-service": 1,
+      "notification-service": 1
+    },
+    "rabbitmq": {
+      "messagesReady": 0,
+      "messagesUnacknowledged": 0,
+      "consumers": 1
+    },
+    "mailhogMessages": 16
+  },
+  "injectedAt": "2026-10-10T15:13:48+05:30",
+  "canaryOrder": {
+    "httpStatus": 201,
+    "orderId": "42707464-7f9f-41b2-bc8b-440e6724a620"
+  },
+  "termination": "guardrail_triggered",
+  "terminationReason": "Target unavailable for 15.0s; 15s safety limit reached",
+  "after": {
+    "applicationTargets": {
+      "auth-service": 1,
+      "product-service": 1,
+      "order-service": 1,
+      "notification-service": 1
+    },
+    "rabbitmq": {
+      "messagesReady": 0,
+      "messagesUnacknowledged": 0,
+      "consumers": 1
+    },
+    "mailhogMessages": 17,
+    "firingSafetyAlerts": []
+  },
+  "recoverySeconds": 5.1,
+  "assertions": {
+    "faultObservedByPrometheus": true,
+    "checkoutAvailableDuringFault": true,
+    "rabbitMqBufferedNotification": true,
+    "automaticRollbackExecuted": true,
+    "recoveryWithinDeadline": true
+  },
+  "finishedAt": "2026-10-10T15:14:08+05:30",
+  "totalSeconds": 21.326
+}

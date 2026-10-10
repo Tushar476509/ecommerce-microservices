@@ -14,3 +14,5 @@ yarn-error.log*
 next-env.d.ts
 coverage/
 .turbo/
+chaos/KILL_SWITCH
+chaos/.experiment.lock

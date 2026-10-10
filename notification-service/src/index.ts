@@ -1,11 +1,49 @@
 import mongoose from "mongoose";
+import express from "express";
 import dotenv from "dotenv";
 import { startConsumer } from "./consumers/orderConsumer";
 import { logger } from "./utils/logger";
+import { verifyEmailTransport } from "./utils/email";
+import { metricsRegistry } from "./utils/metrics";
 
 dotenv.config();
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const healthApp = express();
+const HEALTH_PORT = Number(process.env.HEALTH_PORT || 3004);
+let consumerReady = false;
+
+healthApp.get("/health/live", (_req, res) => {
+  res.json({ status: "ok", service: "notification-service" });
+});
+
+healthApp.get("/health/ready", async (_req, res) => {
+  const mongoReady = mongoose.connection.readyState === 1;
+  let smtpReady = false;
+
+  try {
+    await verifyEmailTransport();
+    smtpReady = true;
+  } catch {
+    smtpReady = false;
+  }
+
+  const ready = mongoReady && consumerReady && smtpReady;
+  return res.status(ready ? 200 : 503).json({
+    status: ready ? "ready" : "not_ready",
+    service: "notification-service",
+    dependencies: {
+      mongodb: mongoReady ? "up" : "down",
+      rabbitmq: consumerReady ? "up" : "down",
+      mailhog: smtpReady ? "up" : "down",
+    },
+  });
+});
+
+healthApp.get("/metrics", async (_req, res) => {
+  res.setHeader("Content-Type", metricsRegistry.contentType);
+  return res.send(await metricsRegistry.metrics());
+});
 
 const start = async () => {
   try {
@@ -23,6 +61,10 @@ const start = async () => {
   while (retries > 0) {
     try {
       await startConsumer();
+      consumerReady = true;
+      healthApp.listen(HEALTH_PORT, () => {
+        logger.info(`Notification health server running on port ${HEALTH_PORT}`);
+      });
       logger.info("Notification service running");
       return;
     } catch (error) {

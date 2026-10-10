@@ -20,8 +20,8 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ matrix.service }}
-        run: npm install
+        run: npm ci
 
       - name: Type check
         working-directory: ${{ matrix.service }}
-        run: npx tsc --noEmit || true
+        run: npx tsc --noEmit

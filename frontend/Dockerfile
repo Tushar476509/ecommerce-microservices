@@ -10,8 +10,10 @@ ENV NEXT_PUBLIC_ORDER_API_URL=$NEXT_PUBLIC_ORDER_API_URL
 
 WORKDIR /app
 
+RUN mkdir -p public
+
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 

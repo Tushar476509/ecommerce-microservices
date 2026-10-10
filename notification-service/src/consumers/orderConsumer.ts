@@ -9,9 +9,13 @@ import {
   orderShippedTemplate,
   orderDeliveredTemplate,
 } from "../templates/emails";
+import { notificationDuration, notificationEvents } from "../utils/metrics";
 
 const RABBITMQ_URL =
   process.env.RABBITMQ_URL || "amqp://ecommerce:ecommerce123@localhost:5672";
+
+const getRecipient = (data: OrderEvent) =>
+  data.email || process.env.DEFAULT_NOTIFICATION_EMAIL || "customer@example.com";
 
 const retryWithBackoff = async <T>(
   fn: () => Promise<T>,
@@ -32,6 +36,7 @@ const retryWithBackoff = async <T>(
 
 const handleOrderCreated = async (data: OrderEvent) => {
   logger.info(`Processing order.created: ${data.orderId}`);
+  const recipient = getRecipient(data);
 
   const html = orderCreatedTemplate({
     orderId: data.orderId,
@@ -41,7 +46,7 @@ const handleOrderCreated = async (data: OrderEvent) => {
 
   await retryWithBackoff(async () => {
     await sendEmail(
-      "customer@example.com",
+      recipient,
       `Order Confirmed - #${data.orderId}`,
       html
     );
@@ -50,7 +55,7 @@ const handleOrderCreated = async (data: OrderEvent) => {
 
   await NotificationModel.create({
     type: "order.created",
-    email: "customer@example.com",
+    email: recipient,
     subject: `Order Confirmed - #${data.orderId}`,
     html,
     metadata: data,
@@ -60,12 +65,13 @@ const handleOrderCreated = async (data: OrderEvent) => {
 
 const handlePaymentConfirmed = async (data: OrderEvent) => {
   logger.info(`Processing payment.confirmed: ${data.orderId}`);
+  const recipient = getRecipient(data);
 
   const html = paymentConfirmedTemplate({ orderId: data.orderId });
 
   await retryWithBackoff(async () => {
     await sendEmail(
-      "customer@example.com",
+      recipient,
       `Payment Confirmed - #${data.orderId}`,
       html
     );
@@ -74,7 +80,7 @@ const handlePaymentConfirmed = async (data: OrderEvent) => {
 
   await NotificationModel.create({
     type: "payment.confirmed",
-    email: "customer@example.com",
+    email: recipient,
     subject: `Payment Confirmed - #${data.orderId}`,
     html,
     metadata: data,
@@ -84,6 +90,7 @@ const handlePaymentConfirmed = async (data: OrderEvent) => {
 
 const handleOrderShipped = async (data: OrderEvent) => {
   logger.info(`Processing order.shipped: ${data.orderId}`);
+  const recipient = getRecipient(data);
 
   const html = orderShippedTemplate({
     orderId: data.orderId,
@@ -93,7 +100,7 @@ const handleOrderShipped = async (data: OrderEvent) => {
 
   await retryWithBackoff(async () => {
     await sendEmail(
-      "customer@example.com",
+      recipient,
       `Your Order Has Shipped - #${data.orderId}`,
       html
     );
@@ -102,7 +109,7 @@ const handleOrderShipped = async (data: OrderEvent) => {
 
   await NotificationModel.create({
     type: "order.shipped",
-    email: "customer@example.com",
+    email: recipient,
     subject: `Your Order Has Shipped - #${data.orderId}`,
     html,
     metadata: data,
@@ -112,12 +119,13 @@ const handleOrderShipped = async (data: OrderEvent) => {
 
 const handleOrderDelivered = async (data: OrderEvent) => {
   logger.info(`Processing order.delivered: ${data.orderId}`);
+  const recipient = getRecipient(data);
 
   const html = orderDeliveredTemplate({ orderId: data.orderId });
 
   await retryWithBackoff(async () => {
     await sendEmail(
-      "customer@example.com",
+      recipient,
       `Order Delivered - #${data.orderId}`,
       html
     );
@@ -126,7 +134,7 @@ const handleOrderDelivered = async (data: OrderEvent) => {
 
   await NotificationModel.create({
     type: "order.delivered",
-    email: "customer@example.com",
+    email: recipient,
     subject: `Order Delivered - #${data.orderId}`,
     html,
     metadata: data,
@@ -164,19 +172,23 @@ export const startConsumer = async () => {
     if (!msg) return;
 
     const routingKey = msg.fields.routingKey;
-    const data: OrderEvent = JSON.parse(msg.content.toString());
-
-    logger.info(`Received event: ${routingKey}`, data);
+    const stopTimer = notificationDuration.startTimer({ routing_key: routingKey });
 
     try {
+      const data: OrderEvent = JSON.parse(msg.content.toString());
+      logger.info(`Received event: ${routingKey}`, data);
       const handler = handlers[routingKey];
       if (handler) {
         await handler(data);
       }
+      notificationEvents.inc({ routing_key: routingKey, status: "success" });
       channel.ack(msg);
     } catch (error) {
+      notificationEvents.inc({ routing_key: routingKey, status: "failure" });
       logger.error(`Error processing ${routingKey}:`, error);
       channel.nack(msg, false, true);
+    } finally {
+      stopTimer();
     }
   });
 

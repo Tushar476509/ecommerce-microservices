@@ -1,0 +1,18 @@
+{
+  "id": "notification-service-crash",
+  "description": "Stop the notification consumer while checkout continues and RabbitMQ buffers the event.",
+  "target": "notification-service",
+  "fault": "container-stop",
+  "hypothesis": "Checkout remains available, one notification is buffered, and delivery resumes after rollback.",
+  "durationSeconds": 20,
+  "monitorIntervalSeconds": 2,
+  "recoveryDeadlineSeconds": 30,
+  "guardrails": {
+    "maximumConcurrentFaultTargets": 1,
+    "maximumTargetUnavailableSeconds": 15,
+    "maximumHttpErrorRate": 0.05,
+    "maximumP95LatencyMilliseconds": 100,
+    "maximumRabbitMqReadyMessages": 50
+  },
+  "expectedSafetyAction": "abort_experiment"
+}

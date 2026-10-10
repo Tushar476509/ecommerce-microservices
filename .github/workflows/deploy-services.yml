@@ -49,7 +49,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ matrix.service }}
-        run: npm install
+        run: npm ci
 
       - name: Build
         working-directory: ${{ matrix.service }}

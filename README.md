@@ -205,9 +205,8 @@ cd ecommerce-microservices
 # 2. Start everything (10 containers)
 docker compose up --build -d
 
-# 3. Seed initial data (admin user, categories, products)
-docker exec ecommerce-postgres psql -U ecommerce -d ecommerce_auth \
-  -c "UPDATE \"User\" SET role='ADMIN' WHERE email='admin@test.com';"
+# 3. The startup scripts automatically seed the local admin and product catalog.
+# Default local admin: admin@test.com / 123456
 
 # 4. Access the platform
 open http://localhost:3000
@@ -263,6 +262,8 @@ cd frontend && npm install && cp .env.example .env && npm run dev
 | `JWT_REFRESH_SECRET` | `super-secret-refresh-key-change-in-production` | Refresh token key |
 | `JWT_EXPIRES_IN` | `15m` | Access token TTL |
 | `JWT_REFRESH_EXPIRES_IN` | `7d` | Refresh token TTL |
+| `ADMIN_EMAIL` | `admin@test.com` | Idempotently seeded local administrator |
+| `ADMIN_PASSWORD` | `123456` | Local administrator password; override outside the sandbox |
 | `PORT` | `3001` | Service port |
 | `FRONTEND_URL` | `http://localhost:3000` | CORS origin |
 
@@ -294,9 +295,11 @@ cd frontend && npm install && cp .env.example .env && npm run dev
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `RABBITMQ_URL` | `amqp://ecommerce:ecommerce123@rabbitmq:5672` | Message broker |
-| `RESEND_API_KEY` | `re_placeholder` | Resend email API key |
 | `MONGODB_URI` | `mongodb://ecommerce:ecommerce123@mongodb:27017/ecommerce` | Notification storage |
 | `FROM_EMAIL` | `noreply@ecommerce.com` | Sender address |
+| `SMTP_HOST` | `mailhog` | Local SMTP server |
+| `SMTP_PORT` | `1025` | Local SMTP port |
+| `HEALTH_PORT` | `3004` | Internal notification health server |
 
 ---
 
@@ -381,11 +384,50 @@ The admin panel allows:
 | Tool | URL | Credentials |
 |------|-----|-------------|
 | MailHog | `http://localhost:8025` | — |
+| Prometheus | `http://localhost:9090` | — |
+| Grafana | `http://localhost:3005` | `admin` / `admin` |
+| cAdvisor | `http://localhost:8080` | — |
 | RabbitMQ Management | `http://localhost:15672` | `ecommerce` / `ecommerce123` |
 | Frontend | `http://localhost:3000` | — |
 | Auth API | `http://localhost:3004` | — |
 | Products API | `http://localhost:3002` | — |
 | Orders API | `http://localhost:3003` | — |
+
+Application readiness endpoints are available at `/health/ready` on the Auth,
+Product, and Order APIs. The notification service exposes the same endpoint on
+its internal container port `3004`. Docker Compose uses these checks before
+starting the frontend.
+
+### Monitoring baseline
+
+Prometheus scrapes application, RabbitMQ, and container metrics every five
+seconds. Grafana automatically provisions the **E-Commerce Resilience
+Baseline** dashboard. To reproduce the normal-load baseline:
+
+```bash
+docker compose --profile tools run --rm k6
+```
+
+The recorded baseline, raw results, and derived safety thresholds are
+documented in [`docs/monitoring-baseline.md`](docs/monitoring-baseline.md).
+
+### Controlled failure injection
+
+The first sandbox experiment stops the notification consumer while checkout
+continues and RabbitMQ buffers the notification. A safety controller enforces
+the target allow-list, single-fault limit, monitoring thresholds, 15-second
+unavailability limit, automatic rollback, and 30-second recovery deadline.
+
+```bash
+# Preflight only
+python3 chaos/run_experiment.py --dry-run
+
+# Inject the controlled fault and automatically recover
+python3 chaos/run_experiment.py
+```
+
+See [`docs/controlled-failure-injection.md`](docs/controlled-failure-injection.md)
+for the experiment hypothesis, kill switch, guardrails, and expected outcome.
 
 ---
 
