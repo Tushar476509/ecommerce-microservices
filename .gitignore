@@ -16,3 +16,6 @@ coverage/
 .turbo/
 chaos/KILL_SWITCH
 chaos/.experiment.lock
+__pycache__/
+safety/runtime/
+safety/state/

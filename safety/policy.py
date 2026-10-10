@@ -52,7 +52,21 @@ class SafetyPolicyEvaluator:
                 {"event": snapshot.unexpected_container_event},
             )
 
-        telemetry_unknown = bool(snapshot.telemetry_error)
+        required = set(self.policy["monitoring"]["requiredJobs"]) - {expected_absent_target}
+        required_probes = {probe["id"] for probe in self.policy["monitoring"]["probes"]}
+        telemetry_unknown = (
+            bool(snapshot.telemetry_error)
+            or bool(required - snapshot.target_up.keys())
+            or bool(required_probes - snapshot.probes.keys())
+            or any(snapshot.target_up[name].validity == Validity.UNKNOWN
+                   for name in required & snapshot.target_up.keys())
+            or any(service not in values or values[service].validity == Validity.UNKNOWN
+                   or (values[service].validity == Validity.HEALTHY
+                       and (values[service].value is None
+                            or not math.isfinite(values[service].value)))
+                   for service in self.policy["monitoring"]["protectedHttpServices"]
+                   for values in (snapshot.error_fraction, snapshot.p95_latency_ms))
+        )
         if self._sustained(
             "telemetry-unavailable",
             telemetry_unknown,
@@ -110,7 +124,7 @@ class SafetyPolicyEvaluator:
 
         insufficient = False
         insufficient_service = None
-        for service, metric in snapshot.error_fraction.items():
+        for service, metric in [*snapshot.error_fraction.items(), *snapshot.p95_latency_ms.items()]:
             if metric.validity == Validity.INSUFFICIENT_TRAFFIC:
                 insufficient = True
                 insufficient_service = service

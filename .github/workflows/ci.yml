@@ -5,6 +5,18 @@ on:
     branches: [main, develop]
 
 jobs:
+  chaos-planning-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify safety admission and planning gates
+        run: python -m unittest discover -s tests -v
+      - name: Verify planning preview
+        run: python -m chaos.planner
+
   lint-and-typecheck:
     runs-on: ubuntu-latest
     strategy:
