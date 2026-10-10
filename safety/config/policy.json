@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "policyVersion": "2026-10-10.1",
+  "sandbox": {
+    "enabled": true,
+    "composeProject": "ecommerce-microservices",
+    "composeWorkingDirectory": "."
+  },
+  "faults": {
+    "allowedTargets": [
+      "frontend",
+      "auth-service",
+      "product-service",
+      "order-service",
+      "notification-service"
+    ],
+    "allowedTypes": ["container-pause"],
+    "maximumConcurrentTargets": 1,
+    "maximumDurationSeconds": 60
+  },
+  "timing": {
+    "evaluationIntervalSeconds": 5,
+    "monitoringRequestDeadlineSeconds": 2,
+    "probeIntervalSeconds": 5,
+    "probeTimeoutSeconds": 2,
+    "baselineDurationSeconds": 180,
+    "rollingWindowSeconds": 60,
+    "recoveryTimeoutSeconds": 120,
+    "healthyRecoveryHoldSeconds": 30,
+    "watchdogLeaseSeconds": 8,
+    "watchdogRenewSeconds": 2,
+    "watchdogEvaluationSeconds": 0.5,
+    "rollbackAttemptTimeoutSeconds": 5,
+    "rollbackRetryCount": 3
+  },
+  "admission": {
+    "baselineArtifact": "observability/baseline.json",
+    "baselineMaximumAgeSeconds": 86400,
+    "maximumBaselineErrorFraction": 0.01,
+    "maximumBaselineP95Milliseconds": 750,
+    "minimumRequestCountPerWindow": 100,
+    "maximumStabilityRatio": 1.2
+  },
+  "abort": {
+    "maximumErrorFraction": 0.05,
+    "relativeP95Multiplier": 3,
+    "relativeP95FloorMilliseconds": 1000,
+    "absoluteP95Milliseconds": 2000,
+    "sustainedBreachSeconds": 15,
+    "telemetryUnavailableSeconds": 10,
+    "maximumSourceAgeSeconds": 15,
+    "telemetryStaleSeconds": 10,
+    "insufficientTrafficSeconds": 15,
+    "criticalProbeConsecutiveFailures": 3
+  },
+  "monitoring": {
+    "prometheusUrl": "http://localhost:9090",
+    "scrapeIntervalSeconds": 5,
+    "requiredJobs": [
+      "auth-service",
+      "product-service",
+      "order-service",
+      "notification-service"
+    ],
+    "protectedHttpServices": ["product-service"],
+    "probes": [
+      {"id": "frontend", "url": "http://localhost:3000", "expectedStatus": 200},
+      {"id": "auth-service", "url": "http://localhost:3004/health/ready", "expectedStatus": 200},
+      {"id": "product-service", "url": "http://localhost:3002/health/ready", "expectedStatus": 200},
+      {"id": "order-service", "url": "http://localhost:3003/health/ready", "expectedStatus": 200}
+    ]
+  },
+  "profiles": {
+    "notification-pause": {
+      "target": "notification-service",
+      "faultType": "container-pause",
+      "durationSeconds": 20,
+      "requireAdequateTraffic": false,
+      "expectedTargetTelemetryAbsence": true
+    },
+    "notification-pause-acceptance": {
+      "target": "notification-service",
+      "faultType": "container-pause",
+      "durationSeconds": 12,
+      "requireAdequateTraffic": false,
+      "expectedTargetTelemetryAbsence": true,
+      "recoveryHoldSeconds": 5
+    }
+  }
+}

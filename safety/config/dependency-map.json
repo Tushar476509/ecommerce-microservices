@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "services": {
+    "frontend": ["auth-service", "product-service", "order-service"],
+    "auth-service": ["postgres"],
+    "product-service": ["postgres", "mongodb", "redis"],
+    "order-service": ["postgres", "rabbitmq"],
+    "notification-service": ["rabbitmq", "mongodb", "mailhog"]
+  },
+  "evidence": {
+    "compose": "docker-compose.yml",
+    "orderPublisher": "order-service/src/utils/rabbitmq.ts",
+    "notificationConsumer": "notification-service/src/consumers/orderConsumer.ts"
+  }
+}
