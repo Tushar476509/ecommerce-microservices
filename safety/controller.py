@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import signal
 import threading
 import time
@@ -27,15 +28,15 @@ def load_baseline(policy: dict[str, Any]) -> Baseline:
         raise ControllerError("Recorded monitoring baseline did not pass")
     captured = datetime.fromisoformat(artifact["capturedAt"])
     age = datetime.now().astimezone().timestamp() - captured.timestamp()
-    if age > float(policy["admission"]["baselineMaximumAgeSeconds"]):
+    if not 0 <= age <= float(policy["admission"]["baselineMaximumAgeSeconds"]):
         raise ControllerError(f"Recorded baseline is stale ({age:.0f}s old)")
-    if float(artifact["http"]["failureRate"]) >= float(
-        policy["admission"]["maximumBaselineErrorFraction"]
-    ):
+    error_fraction = float(artifact["http"]["failureRate"])
+    if not math.isfinite(error_fraction) or not 0 <= error_fraction < float(
+        policy["admission"]["maximumBaselineErrorFraction"]):
         raise ControllerError("Baseline error fraction blocks admission")
-    if float(artifact["http"]["latencyMilliseconds"]["p95"]) >= float(
-        policy["admission"]["maximumBaselineP95Milliseconds"]
-    ):
+    p95 = float(artifact["http"]["latencyMilliseconds"]["p95"])
+    if not math.isfinite(p95) or not 0 <= p95 < float(
+        policy["admission"]["maximumBaselineP95Milliseconds"]):
         raise ControllerError("Baseline latency blocks admission")
     if any(int(value) != 0 for value in artifact["availability"]["containerRestarts"].values()):
         raise ControllerError("Baseline contains unresolved container restarts")
@@ -43,6 +44,10 @@ def load_baseline(policy: dict[str, Any]) -> Baseline:
     protected = policy["monitoring"]["protectedHttpServices"]
     minimum = int(policy["admission"]["minimumRequestCountPerWindow"])
     for service in protected:
+        service_p95 = float(artifact["http"]["serviceP95Milliseconds"][service])
+        if not math.isfinite(service_p95) or not 0 <= service_p95 < float(
+                policy["admission"]["maximumBaselineP95Milliseconds"]):
+            raise ControllerError(f"Baseline latency for {service} blocks admission")
         if int(service_counts.get(service, 0)) < minimum:
             raise ControllerError(
                 f"Baseline traffic for {service} is insufficient: {service_counts.get(service, 0)} < {minimum}"
@@ -100,6 +105,34 @@ class SafetyController:
     def _healthy_preflight(self, snapshot, *, expected_absent: str | None = None) -> None:
         if snapshot.telemetry_error:
             raise ControllerError(f"Monitoring is unavailable: {snapshot.telemetry_error}")
+        required = set(self.policy["monitoring"]["requiredJobs"]) - {expected_absent}
+        if required - snapshot.target_up.keys():
+            raise ControllerError("Required telemetry targets are missing")
+        required_probes = {probe["id"] for probe in self.policy["monitoring"]["probes"]}
+        if required_probes - snapshot.probes.keys():
+            raise ControllerError("Required critical probes are missing")
+        maximum_age = float(self.policy["abort"]["maximumSourceAgeSeconds"])
+        for service in required:
+            metric = snapshot.target_up[service]
+            if (metric.source_timestamp is None
+                    or not math.isfinite(metric.source_timestamp)
+                    or not 0 <= snapshot.observed_at - metric.source_timestamp <= maximum_age):
+                raise ControllerError(f"Telemetry for {service} is stale or invalid")
+        for service in self.policy["monitoring"]["protectedHttpServices"]:
+            for values, ceiling in (
+                (snapshot.error_fraction, self.policy["admission"]["maximumBaselineErrorFraction"]),
+                (snapshot.p95_latency_ms, self.policy["admission"]["maximumBaselineP95Milliseconds"]),
+            ):
+                metric = values.get(service)
+                if (metric is None or metric.validity != Validity.HEALTHY
+                        or metric.value is None or not math.isfinite(metric.value)
+                        or not 0 <= metric.value < float(ceiling)
+                        or metric.request_count is None
+                        or metric.request_count < self.policy["admission"]["minimumRequestCountPerWindow"]
+                        or metric.source_timestamp is None
+                        or not math.isfinite(metric.source_timestamp)
+                        or not 0 <= snapshot.observed_at - metric.source_timestamp <= maximum_age):
+                    raise ControllerError(f"Live baseline metric for {service} is unhealthy or incomplete")
         failures = [probe_id for probe_id, probe in snapshot.probes.items() if not probe.valid]
         if failures:
             raise ControllerError(f"Critical probes failed: {failures}")
@@ -317,6 +350,7 @@ class SafetyController:
             )
             return {
                 "experimentId": experiment_id,
+                "profile": profile_name,
                 "faultId": fault_id,
                 "state": terminal.value,
                 "reasonCode": reason.value,

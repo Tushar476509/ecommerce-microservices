@@ -1,5 +1,8 @@
 # E-Commerce Microservices
 
+Chaos engineering: see the [safety review and experiment planner](docs/safety-and-planning-review.md)
+for the current milestone assessment, planning commands, and pending sandbox acceptance.
+
 ![CI/CD](https://img.shields.io/badge/CI/CD-GitHub%20Actions-blue)
 ![Version](https://img.shields.io/badge/version-1.0.0-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
