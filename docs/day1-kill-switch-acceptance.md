@@ -1,5 +1,31 @@
 # Day 1 manual kill-switch acceptance
 
+## Verified live run
+
+Passed on 2026-10-10 at 16:03 IST in a fresh GitHub Actions Docker sandbox:
+[workflow run 38045165667](https://github.com/Tushar476509/ecommerce-microservices/actions/runs/38045165667).
+The workflow tested experiment code at commit `e12694f`.
+
+| Observation | Actual result |
+| --- | --- |
+| Notification outage observed by Prometheus | Yes |
+| Notification buffered during outage | 1 message |
+| Checkout while target was stopped | HTTP 201 |
+| External file kill switch handled | `termination=kill_switch` |
+| Verified recovery | 6.717 seconds, within 30-second deadline |
+| Final application targets | 4/4 up |
+| Final queue and consumer | 0 ready messages, 1 consumer |
+| Buffered email delivered | MailHog message count increased from 0 to 1 |
+| Acceptance assertions | 9/9 passed |
+
+Actual downloaded evidence is committed in
+[acceptance result](../chaos/results/manual-kill-acceptance.json) and
+[experiment result](../chaos/results/manual-kill-experiment.json).
+Together with the existing dependency/data-flow diagrams, baseline, and prior
+threshold-triggered rollback evidence, this closes the recorded Day 1 kill-switch
+gap. The operator action in this run is automated from a separate process; the
+same file operation can be performed by a person during a presentation.
+
 The existing stop experiment demonstrates automatic rollback at its 15-second
 outage limit. The missing check is whether an externally engaged kill switch
 also removes the fault and restores the application.
